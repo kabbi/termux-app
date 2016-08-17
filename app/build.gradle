@@ -30,8 +30,18 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    sourceSets {
+        main {
+            jniLibs.srcDir file('jniLibs/')
+        }
+    }
 }
 
 dependencies {
+    // TODO: Find better way to distribute libraries
+    compile project(':libraries:audio')
+    compile project(':libraries:base')
+    compile project(':libraries:common')
     testCompile 'junit:junit:4.12'
 }

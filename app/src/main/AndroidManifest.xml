@@ -4,13 +4,19 @@
     android:sharedUserId="com.termux"
     android:sharedUserLabel="@string/shared_user_label" >
 
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true"/>
+    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="true"/>
+    <uses-feature android:name="android.software.vr.mode" android:required="false"/>
+    <uses-feature android:name="android.hardware.vr.high_performance" android:required="false"/>
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.NFC"/>
 
     <application
         android:allowBackup="true"
@@ -22,7 +28,7 @@
         android:supportsRtl="false" >
 
         <activity
-            android:name="com.termux.app.TermuxActivity"
+            android:name=".app.TermuxActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize|stateAlwaysVisible" >
@@ -37,14 +43,33 @@
         </activity>
 
         <activity
-            android:name="com.termux.app.TermuxHelpActivity"
+            android:name=".app.TermuxVrActivity"
+            android:label="@string/vr_activity_label"
+            android:icon="@drawable/ic_service_notification"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
+            android:screenOrientation="landscape"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateAlwaysVisible" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="com.google.intent.category.CARDBOARD" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".app.TermuxHelpActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Material.Light.DarkActionBar"
             android:parentActivityName=".app.TermuxActivity"
             android:label="@string/application_name" />
 
         <activity
-            android:name="com.termux.filepicker.TermuxFileReceiverActivity"
+            android:name=".filepicker.TermuxFileReceiverActivity"
             android:label="@string/application_name"
             android:taskAffinity="com.termux.filereceiver"
             android:excludeFromRecents="true"

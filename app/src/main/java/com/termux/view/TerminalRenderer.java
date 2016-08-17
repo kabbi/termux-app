@@ -16,7 +16,7 @@ import com.termux.terminal.WcWidth;
  * <p/>
  * Saves font metrics, so needs to be recreated each time the typeface or font size changes.
  */
-final class TerminalRenderer {
+final public class TerminalRenderer {
 
     final int mTextSize;
     final Typeface mTypeface;
