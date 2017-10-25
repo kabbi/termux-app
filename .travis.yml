@@ -26,9 +26,9 @@ script:
 addons:
   coverity_scan:
     project:
-      name: "termux/termux-app"
+      name: "brysgo/termux-app"
       description: "Terminal emulator and Linux environment for Android"
-    notification_email: fredrik@fornwall.net
+    notification_email: brysgo@gmail.com
     build_command_prepend: "./gradlew clean"
     build_command: "./gradlew build"
     branch_pattern: master
