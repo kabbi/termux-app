@@ -1,26 +1,22 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 24
-    buildToolsVersion "24.0.1"
+    compileSdkVersion 26
+    buildToolsVersion "26.0.1"
 
     dependencies {
-        compile 'com.android.support:support-annotations:24.1.1'
-        compile "com.android.support:support-v4:24.1.1"
+        compile 'com.android.support:support-annotations:26.1.0'
+        compile "com.android.support:support-core-utils:26.1.0"
+        compile "com.android.support:support-core-ui:26.1.0"
+        compile project(":terminal-view")
     }
 
     defaultConfig {
         applicationId "com.termux"
         minSdkVersion 21
-        targetSdkVersion 24
-        versionCode 39
-        versionName "0.39"
-
-        ndk {
-            moduleName "libtermux"
-            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            cFlags "-std=c11 -Wall -Wextra -Os -fno-stack-protector -nostdlib -Wl,--gc-sections"
-        }
+        targetSdkVersion 26
+        versionCode 53
+        versionName "0.53"
     }
 
     buildTypes {

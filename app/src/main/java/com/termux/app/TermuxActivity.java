@@ -213,7 +213,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
 
         setContentView(R.layout.drawer_layout);
         mTerminalView = (TerminalView) findViewById(R.id.terminal_view);
-        mTerminalView.setOnKeyListener(new TermuxKeyListener(this));
+        mTerminalView.setOnKeyListener(new TermuxViewClient(this));
 
         mTerminalView.setTextSize(mSettings.getFontSize());
         mFullScreenHelper.setImmersive(mSettings.isFullScreen());
@@ -248,7 +248,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                             TerminalSession session = getCurrentTermSession();
                             if (session != null) {
                                 if (session.isRunning()) {
-                                    session.write(editText.getText().toString() + "\n");
+                                    String textToSend = editText.getText().toString();
+                                    if (textToSend.length() == 0) textToSend = "\n";
+                                    session.write(textToSend);
                                 } else {
                                     removeFinishedSession(session);
                                 }
@@ -395,27 +397,26 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
             @Override
             public void onClipboardText(TerminalSession session, String text) {
                 if (!mIsVisible) return;
-                showToast("Clipboard:\n\"" + text + "\"", false);
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 clipboard.setPrimaryClip(new ClipData(null, new String[]{"text/plain"}, new ClipData.Item(text)));
             }
 
             @Override
             public void onBell(TerminalSession session) {
-                if (mIsVisible) {
-                    switch (mSettings.mBellBehaviour) {
-                        case TermuxPreferences.BELL_BEEP:
-                            mBellSoundPool.play(mBellSoundId, 1.f, 1.f, 1, 0, 1.f);
-                            break;
-                        case TermuxPreferences.BELL_VIBRATE:
-                            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(50);
-                            break;
-                        case TermuxPreferences.BELL_IGNORE:
-                            // Ignore the bell character.
-                            break;
-                    }
+                if (!mIsVisible) return;
 
+                switch (mSettings.mBellBehaviour) {
+                    case TermuxPreferences.BELL_BEEP:
+                        mBellSoundPool.play(mBellSoundId, 1.f, 1.f, 1, 0, 1.f);
+                        break;
+                    case TermuxPreferences.BELL_VIBRATE:
+                        ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(50);
+                        break;
+                    case TermuxPreferences.BELL_IGNORE:
+                        // Ignore the bell character.
+                        break;
                 }
+
             }
 
             @Override
@@ -429,8 +430,9 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
             final StyleSpan boldSpan = new StyleSpan(Typeface.BOLD);
             final StyleSpan italicSpan = new StyleSpan(Typeface.ITALIC);
 
+            @NonNull
             @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View row = convertView;
                 if (row == null) {
                     LayoutInflater inflater = getLayoutInflater();
@@ -491,17 +493,6 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                     public void run() {
                         if (mTermService == null) return; // Activity might have been destroyed.
                         try {
-                            if (TermuxPreferences.isShowWelcomeDialog(TermuxActivity.this)) {
-                                new AlertDialog.Builder(TermuxActivity.this).setTitle(R.string.welcome_dialog_title).setMessage(R.string.welcome_dialog_body)
-                                    .setCancelable(false).setPositiveButton(android.R.string.ok, null)
-                                    .setNegativeButton(R.string.welcome_dialog_dont_show_again_button, new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialog, int which) {
-                                            TermuxPreferences.disableWelcomeDialog(TermuxActivity.this);
-                                            dialog.dismiss();
-                                        }
-                                    }).show();
-                            }
                             addNewSession(false, null);
                         } catch (WindowManager.BadTokenException e) {
                             // Activity finished - ignore.
@@ -513,7 +504,13 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
                 finish();
             }
         } else {
-            switchToSession(getStoredCurrentSessionOrLast());
+            Intent i = getIntent();
+            if (i != null && Intent.ACTION_RUN.equals(i.getAction())) {
+                // Android 7.1 app shortcut from res/xml/shortcuts.xml.
+                addNewSession(false, null);
+            } else {
+                switchToSession(getStoredCurrentSessionOrLast());
+            }
         }
     }
 
@@ -534,6 +531,7 @@ public final class TermuxActivity extends Activity implements ServiceConnection 
             @Override
             public void onTextSet(String text) {
                 sessionToRename.mSessionName = text;
+                mListViewAdapter.notifyDataSetChanged();
             }
         }, -1, null, -1, null, null);
     }

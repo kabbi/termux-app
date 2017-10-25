@@ -18,6 +18,8 @@
             <option value="$PROJECT_DIR$/libraries/controller" />
             <option value="$PROJECT_DIR$/libraries/panowidget" />
             <option value="$PROJECT_DIR$/libraries/videowidget" />
+            <option value="$PROJECT_DIR$/terminal-emulator" />
+            <option value="$PROJECT_DIR$/terminal-view" />
           </set>
         </option>
         <option name="myModules">
@@ -32,8 +34,11 @@
             <option value="$PROJECT_DIR$/libraries/controller" />
             <option value="$PROJECT_DIR$/libraries/panowidget" />
             <option value="$PROJECT_DIR$/libraries/videowidget" />
+            <option value="$PROJECT_DIR$/terminal-emulator" />
+            <option value="$PROJECT_DIR$/terminal-view" />
           </set>
         </option>
+        <option name="resolveModulePerSourceSet" value="false" />
       </GradleProjectSettings>
     </option>
   </component>

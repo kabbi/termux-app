@@ -11,8 +11,10 @@ import android.content.res.Resources;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.support.v4.content.WakefulBroadcastReceiver;
 import android.util.Log;
 import android.widget.ArrayAdapter;
 
@@ -22,7 +24,6 @@ import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSession.SessionChangedCallback;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,18 +49,16 @@ public final class TermuxService extends Service implements SessionChangedCallba
 
     private static final int NOTIFICATION_ID = 1337;
 
-    /** Intent action to stop the service. */
     private static final String ACTION_STOP_SERVICE = "com.termux.service_stop";
-    /** Intent action to toggle the wake lock, {@link #mWakeLock}, which this service may hold. */
-    private static final String ACTION_LOCK_WAKE = "com.termux.service_toggle_wake_lock";
-    /** Intent action to toggle the wifi lock, {@link #mWifiLock}, which this service may hold. */
-    private static final String ACTION_LOCK_WIFI = "com.termux.service_toggle_wifi_lock";
+    private static final String ACTION_LOCK_WAKE = "com.termux.service_wake_lock";
+    private static final String ACTION_UNLOCK_WAKE = "com.termux.service_wake_unlock";
     /** Intent action to launch a new terminal session. Executed from TermuxWidgetProvider. */
     public static final String ACTION_EXECUTE = "com.termux.service_execute";
 
     public static final String EXTRA_ARGUMENTS = "com.termux.execute.arguments";
 
     public static final String EXTRA_CURRENT_WORKING_DIRECTORY = "com.termux.execute.cwd";
+    private static final String EXTRA_EXECUTE_IN_BACKGROUND = "com.termux.execute.background";
 
     /** This service is only bound from inside the same process and never uses IPC. */
     class LocalBinder extends Binder {
@@ -67,6 +66,8 @@ public final class TermuxService extends Service implements SessionChangedCallba
     }
 
     private final IBinder mBinder = new LocalBinder();
+
+    private final Handler mHandler = new Handler();
 
     /**
      * The terminal sessions which this service manages.
@@ -76,9 +77,12 @@ public final class TermuxService extends Service implements SessionChangedCallba
      */
     final List<TerminalSession> mTerminalSessions = new ArrayList<>();
 
+    final List<BackgroundJob> mBackgroundTasks = new ArrayList<>();
+
     /** Note that the service may often outlive the activity, so need to clear this reference. */
     SessionChangedCallback mSessionChangeCallback;
 
+    /** The wake lock and wifi lock are always acquired and released together. */
     private PowerManager.WakeLock mWakeLock;
     private WifiManager.WifiLock mWifiLock;
 
@@ -99,43 +103,59 @@ public final class TermuxService extends Service implements SessionChangedCallba
                 PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
                 mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, EmulatorDebug.LOG_TAG);
                 mWakeLock.acquire();
-            } else {
-                mWakeLock.release();
-                mWakeLock = null;
-            }
-            updateNotification();
-        } else if (ACTION_LOCK_WIFI.equals(action)) {
-            if (mWifiLock == null) {
-                WifiManager wm = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+
+                // http://tools.android.com/tech-docs/lint-in-studio-2-3#TOC-WifiManager-Leak
+                WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 mWifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, EmulatorDebug.LOG_TAG);
                 mWifiLock.acquire();
-            } else {
+
+                updateNotification();
+            }
+        } else if (ACTION_UNLOCK_WAKE.equals(action)) {
+            if (mWakeLock != null) {
+                mWakeLock.release();
+                mWakeLock = null;
+
                 mWifiLock.release();
                 mWifiLock = null;
+
+                updateNotification();
             }
-            updateNotification();
         } else if (ACTION_EXECUTE.equals(action)) {
             Uri executableUri = intent.getData();
             String executablePath = (executableUri == null ? null : executableUri.getPath());
+
             String[] arguments = (executableUri == null ? null : intent.getStringArrayExtra(EXTRA_ARGUMENTS));
             String cwd = intent.getStringExtra(EXTRA_CURRENT_WORKING_DIRECTORY);
-            TerminalSession newSession = createTermSession(executablePath, arguments, cwd, false);
 
-            // Transform executable path to session name, e.g. "/bin/do-something.sh" => "do something.sh".
-            if (executablePath != null) {
-                int lastSlash = executablePath.lastIndexOf('/');
-                String name = (lastSlash == -1) ? executablePath : executablePath.substring(lastSlash + 1);
-                name = name.replace('-', ' ');
-                newSession.mSessionName = name;
+            if (intent.getBooleanExtra(EXTRA_EXECUTE_IN_BACKGROUND, false)) {
+                BackgroundJob task = new BackgroundJob(cwd, executablePath, arguments, this);
+                mBackgroundTasks.add(task);
+                updateNotification();
+            } else {
+                TerminalSession newSession = createTermSession(executablePath, arguments, cwd, false);
+
+                // Transform executable path to session name, e.g. "/bin/do-something.sh" => "do something.sh".
+                if (executablePath != null) {
+                    int lastSlash = executablePath.lastIndexOf('/');
+                    String name = (lastSlash == -1) ? executablePath : executablePath.substring(lastSlash + 1);
+                    name = name.replace('-', ' ');
+                    newSession.mSessionName = name;
+                }
+
+                // Make the newly created session the current one to be displayed:
+                TermuxPreferences.storeCurrentSession(this, newSession);
+
+                // Launch the main Termux app, which will now show the current session:
+                startActivity(new Intent(this, TermuxActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             }
-
-            // Make the newly created session the current one to be displayed:
-            TermuxPreferences.storeCurrentSession(this, newSession);
-
-            // Launch the main Termux app, which will now show to current session:
-            startActivity(new Intent(this, TermuxActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } else if (action != null) {
             Log.e(EmulatorDebug.LOG_TAG, "Unknown TermuxService action: '" + action + "'");
+        }
+
+        if ((flags & START_FLAG_REDELIVERY) == 0) {
+            // Service is started by WBR, not restarted by system, so release the WakeLock from WBR.
+            WakefulBroadcastReceiver.completeWakefulIntent(intent);
         }
 
         // If this service really do get killed, there is no point restarting it automatically - let the user do on next
@@ -154,9 +174,9 @@ public final class TermuxService extends Service implements SessionChangedCallba
     }
 
     /** Update the shown foreground service notification after making any changes that affect it. */
-    private void updateNotification() {
-        if (mWakeLock == null && mWifiLock == null && getSessions().isEmpty()) {
-            // Exit if we are updating after the user disabled all locks with no sessions.
+    void updateNotification() {
+        if (mWakeLock == null && mTerminalSessions.isEmpty() && mBackgroundTasks.isEmpty()) {
+            // Exit if we are updating after the user disabled all locks with no sessions or tasks running.
             stopSelf();
         } else {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(NOTIFICATION_ID, buildNotification());
@@ -171,17 +191,14 @@ public final class TermuxService extends Service implements SessionChangedCallba
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notifyIntent, 0);
 
         int sessionCount = mTerminalSessions.size();
-        String contentText = sessionCount + " terminal session" + (sessionCount == 1 ? "" : "s");
-
-        boolean wakeLockHeld = mWakeLock != null;
-        boolean wifiLockHeld = mWifiLock != null;
-        if (wakeLockHeld && wifiLockHeld) {
-            contentText += " (wake&wifi lock held)";
-        } else if (wakeLockHeld) {
-            contentText += " (wake lock held)";
-        } else if (wifiLockHeld) {
-            contentText += " (wifi lock held)";
+        int taskCount = mBackgroundTasks.size();
+        String contentText = sessionCount + " session" + (sessionCount == 1 ? "" : "s");
+        if (taskCount > 0) {
+            contentText += ", " + taskCount + " task" + (taskCount == 1 ? "" : "s");
         }
+
+        final boolean wakeLockHeld = mWakeLock != null;
+        if (wakeLockHeld) contentText += " (wake lock held)";
 
         Notification.Builder builder = new Notification.Builder(this);
         builder.setContentTitle(getText(R.string.application_name));
@@ -192,7 +209,7 @@ public final class TermuxService extends Service implements SessionChangedCallba
 
         // If holding a wake or wifi lock consider the notification of high priority since it's using power,
         // otherwise use a minimal priority since this is just a background service notification:
-        builder.setPriority((wakeLockHeld || wifiLockHeld) ? Notification.PRIORITY_HIGH : Notification.PRIORITY_MIN);
+        builder.setPriority((wakeLockHeld) ? Notification.PRIORITY_HIGH : Notification.PRIORITY_MIN);
 
         // No need to show a timestamp:
         builder.setShowWhen(false);
@@ -204,13 +221,13 @@ public final class TermuxService extends Service implements SessionChangedCallba
         Intent exitIntent = new Intent(this, TermuxService.class).setAction(ACTION_STOP_SERVICE);
         builder.addAction(android.R.drawable.ic_delete, res.getString(R.string.notification_action_exit), PendingIntent.getService(this, 0, exitIntent, 0));
 
-        Intent toggleWakeLockIntent = new Intent(this, TermuxService.class).setAction(ACTION_LOCK_WAKE);
-        builder.addAction(android.R.drawable.ic_lock_lock, res.getString(R.string.notification_action_wakelock),
-            PendingIntent.getService(this, 0, toggleWakeLockIntent, 0));
-
-        Intent toggleWifiLockIntent = new Intent(this, TermuxService.class).setAction(ACTION_LOCK_WIFI);
-        builder.addAction(android.R.drawable.ic_lock_lock, res.getString(R.string.notification_action_wifilock),
-            PendingIntent.getService(this, 0, toggleWifiLockIntent, 0));
+        String newWakeAction = wakeLockHeld ? ACTION_UNLOCK_WAKE : ACTION_LOCK_WAKE;
+        Intent toggleWakeLockIntent = new Intent(this, TermuxService.class).setAction(newWakeAction);
+        String actionTitle = res.getString(wakeLockHeld ?
+            R.string.notification_action_wake_unlock :
+            R.string.notification_action_wake_lock);
+        int actionIcon = wakeLockHeld ? android.R.drawable.ic_lock_idle_lock : android.R.drawable.ic_lock_lock;
+        builder.addAction(actionIcon, actionTitle, PendingIntent.getService(this, 0, toggleWakeLockIntent, 0));
 
         return builder.build();
     }
@@ -236,53 +253,15 @@ public final class TermuxService extends Service implements SessionChangedCallba
 
         if (cwd == null) cwd = HOME_PATH;
 
-        final String termEnv = "TERM=xterm-256color";
-        final String homeEnv = "HOME=" + HOME_PATH;
-        final String prefixEnv = "PREFIX=" + PREFIX_PATH;
-        final String androidRootEnv = "ANDROID_ROOT=" + System.getenv("ANDROID_ROOT");
-        final String androidDataEnv = "ANDROID_DATA=" + System.getenv("ANDROID_DATA");
-        // EXTERNAL_STORAGE is needed for /system/bin/am to work on at least
-        // Samsung S7 - see https://plus.google.com/110070148244138185604/posts/gp8Lk3aCGp3.
-        final String externalStorageEnv = "EXTERNAL_STORAGE=" + System.getenv("EXTERNAL_STORAGE");
-        String[] env;
-        if (failSafe) {
-            // Keep the default path so that system binaries can be used in the failsafe session.
-            final String pathEnv = "PATH=" + System.getenv("PATH");
-            env = new String[]{termEnv, homeEnv, prefixEnv, androidRootEnv, androidDataEnv, pathEnv, externalStorageEnv};
-        } else {
-            final String ps1Env = "PS1=$ ";
-            final String ldEnv = "LD_LIBRARY_PATH=" + PREFIX_PATH + "/lib";
-            final String langEnv = "LANG=en_US.UTF-8";
-            final String pathEnv = "PATH=" + PREFIX_PATH + "/bin:" + PREFIX_PATH + "/bin/applets";
-            final String pwdEnv = "PWD=" + cwd;
+        String[] env = BackgroundJob.buildEnvironment(failSafe, cwd);
+        boolean isLoginShell = false;
 
-            env = new String[]{termEnv, homeEnv, prefixEnv, ps1Env, ldEnv, langEnv, pathEnv, pwdEnv, androidRootEnv, androidDataEnv, externalStorageEnv};
-        }
-
-        String shellName;
         if (executablePath == null) {
-            File shell = new File(HOME_PATH, ".termux/shell");
-            if (shell.exists()) {
-                try {
-                    File canonicalFile = shell.getCanonicalFile();
-                    if (canonicalFile.isFile() && canonicalFile.canExecute()) {
-                        executablePath = canonicalFile.getName().equals("busybox") ? (PREFIX_PATH + "/bin/ash") : canonicalFile.getAbsolutePath();
-                    } else {
-                        Log.w(EmulatorDebug.LOG_TAG, "$HOME/.termux/shell points to non-executable shell: " + canonicalFile.getAbsolutePath());
-                    }
-                } catch (IOException e) {
-                    Log.e(EmulatorDebug.LOG_TAG, "Error checking $HOME/.termux/shell", e);
-                }
-            }
-
-            if (executablePath == null) {
-                // Try bash, zsh and ash in that order:
-                for (String shellBinary : new String[]{"bash", "zsh", "ash"}) {
-                    File shellFile = new File(PREFIX_PATH + "/bin/" + shellBinary);
-                    if (shellFile.canExecute()) {
-                        executablePath = shellFile.getAbsolutePath();
-                        break;
-                    }
+            for (String shellBinary : new String[]{"login", "bash", "zsh"}) {
+                File shellFile = new File(PREFIX_PATH + "/bin/" + shellBinary);
+                if (shellFile.canExecute()) {
+                    executablePath = shellFile.getAbsolutePath();
+                    break;
                 }
             }
 
@@ -290,23 +269,18 @@ public final class TermuxService extends Service implements SessionChangedCallba
                 // Fall back to system shell as last resort:
                 executablePath = "/system/bin/sh";
             }
-
-            String[] parts = executablePath.split("/");
-            shellName = "-" + parts[parts.length - 1];
-        } else {
-            int lastSlashIndex = executablePath.lastIndexOf('/');
-            shellName = lastSlashIndex == -1 ? executablePath : executablePath.substring(lastSlashIndex + 1);
+            isLoginShell = true;
         }
 
-        String[] args;
-        if (arguments == null) {
-            args = new String[]{shellName};
-        } else {
-            args = new String[arguments.length + 1];
-            args[0] = shellName;
+        String[] processArgs = BackgroundJob.setupProcessArgs(executablePath, arguments);
+        executablePath = processArgs[0];
+        int lastSlashIndex = executablePath.lastIndexOf('/');
+        String processName = (isLoginShell ? "-" : "") +
+            (lastSlashIndex == -1 ? executablePath : executablePath.substring(lastSlashIndex + 1));
 
-            System.arraycopy(arguments, 0, args, 1, arguments.length);
-        }
+        String[] args = new String[processArgs.length];
+        args[0] = processName;
+        if (processArgs.length > 1) System.arraycopy(processArgs, 1, args, 1, processArgs.length - 1);
 
         TerminalSession session = new TerminalSession(executablePath, cwd, args, env, this);
         mTerminalSessions.add(session);
@@ -358,4 +332,13 @@ public final class TermuxService extends Service implements SessionChangedCallba
         if (mSessionChangeCallback != null) mSessionChangeCallback.onColorsChanged(session);
     }
 
+    public void onBackgroundJobExited(final BackgroundJob task) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                mBackgroundTasks.remove(task);
+                updateNotification();
+            }
+        });
+    }
 }
