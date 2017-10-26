@@ -6,5 +6,4 @@ include ':libraries:controller'
 include ':libraries:panowidget'
 include ':libraries:videowidget'
 
-include ':app'
-
+include ':app', ':terminal-emulator', ':terminal-view'

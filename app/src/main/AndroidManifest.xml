@@ -19,9 +19,11 @@
     <uses-permission android:name="android.permission.NFC"/>
 
     <application
+        android:extractNativeLibs="true"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backupscheme"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/banner"
         android:label="@string/application_name"
         android:theme="@style/Theme.Termux"
@@ -40,6 +42,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
         <activity
@@ -98,6 +101,18 @@
             </intent-filter>
         </activity>
 
+        <activity-alias
+            android:name=".HomeActivity"
+            android:targetActivity="com.termux.app.TermuxActivity">
+
+            <!-- Launch activity automatically on boot on Android Things devices -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.IOT_LAUNCHER"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity-alias>
+
         <provider
             android:name=".filepicker.TermuxDocumentsProvider"
             android:authorities="com.termux.documents"
@@ -113,6 +128,15 @@
             android:name="com.termux.app.TermuxService"
             android:exported="false" />
 
+        <receiver android:name=".app.TermuxOpenReceiver" />
+
+        <provider android:authorities="com.termux.files"
+                  android:readPermission="android.permission.permRead"
+                  android:exported="true"
+                  android:grantUriPermissions="true"
+                  android:name="com.termux.app.TermuxOpenReceiver$ContentProvider" />
+
+        <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />
     </application>
 
 </manifest>

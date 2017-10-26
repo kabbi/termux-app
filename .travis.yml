@@ -1,30 +1,27 @@
 sudo: false
 language: android
 jdk: oraclejdk8
-
 env:
   global:
-    # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-    # via the "travis encrypt" command using the project repo's public key
-    - secure: "ACnFJxw0VusS2lnGXL+epP/CNJmftWS39YcPdgN2EurWw5ZfXSo7vi+zpMB+11IBS3LQyLFFUambi2N9L4lbReZkHVkoVcZFGZlwbXNTAeqT8CABPTcuOyEOZU4bJwqeYU87ztYipENMLNECaZrgWx5odbWLKnSJQw7Zkb4ArCstfXfYk9u8q49ThRxQyGwHW2xKp1an5aa+3Y6IY+ywsSHw6AvXbyFH078Kolxy86caagczcfmKcMi15QYzwAvFggUphvsO3M5PHJMQXuaNlQxDcQRGUEXsK8aZE0dPH5PB97SFjDALZqI7NEpjZAk5htWjX48ssW064LDbjcBg/ZLgDd8R8uhA159NVZgvcnP2czCn6pmggx1sW5MBmcj7i+bJS2ejaMO+KoovWlVvsch742H5QR6rQaNkjDZRsGVLYvJaR1gBLs898UoT1hcHWoqLVR22r2VFo7OWWCRfNRvZuZDR2HIrYRdFvn8P3nWVMkvXwgsOlxWG5sN+yQqW+6lZS7hivsFhtYs4CkRdoZIan3Qvi/CkY8Lg+ESkZ3IJ0NnId8qOWH+8Xl1sqZ7xlsWTd1sYYHlpvkdvqw1HNLP22EpwwKW5Kb5zBEd/qs3o1OO0Tqa0MR6JpgGdHHRk1iZ25+qTfRVP06vO2RXsgAx4SZfO7DyB0QZn8tGNMMI="
-
+    secure: BJ4ZI+/emJuDPlz27Iaa0JK3vEslCJF8r8Y3Qm1QsPvFKIW4jdmnMiX/bUpTVRYImf69IcCb2LRjMtSbIa2qLa6yZ5GxYOaVAHWhS/dZKWt9Zq0z4lMs9HZ+fXr23gpuch2FHFt06Nm7mtN+4UG0/uboEtRpspca7CbauPiZOnzdeR8lkDG8kat/jCae8WTHrwCZJMERYECPJQD7Js00j0zgdVlquC09LVAdrqIOZTPYYmovCcpvLOieerVRFUC2n40TpUPEYeIKhseioJJrpYMjVhnlfWV/4Zrc7+xiIdjqV+lS9hFtOr8norcvT4ndqG++h7CXAfxDYvceX6vhBMRM8XAfPuo+O51FdUZL/YLlMgc+GbeffDp8XA1cD+XJw5rUnELkIU03i6h4sycwI71WvqPkiiRYzWcn0QsL6A9XfeBZC9Y0trNbGRjX2usZxyuJfXsY7JF7OLLBKCWuvJb210tjHhzhpU1vY53CI0aRx/Ntrf7xGE+EfeK4jULReRKN2ITt01rxx3NaI5iKin6143GAWURChbwnp2qv+SHXz02tAJCtcYOUnlCRpJ0K/6fsZfq/+oYEd/rZ7WB/XzDEIxqKkT9q03Ig4jP3wPN92fApjzrX7WY51MST4CxRs+1C84HHlwyWskNQOCQz42Si5pJv9YgX8Qfio8KNopg=
 android:
   components:
-    - platform-tools
-    - tools
-    - build-tools-24.0.1
-    - android-24
-    - extra-android-m2repository
-
+  - platform-tools
+  - tools
+  - build-tools-26.0.1
+  - android-26
+  - extra-android-m2repository
+before_install:
+- git clone https://github.com/urho3d/android-ndk.git $HOME/android-ndk
+- export ANDROID_NDK_HOME=$HOME/android-ndk
 script:
-  - ./gradlew testDebugUnitTest
-
+- "./gradlew testDebugUnitTest"
 addons:
   coverity_scan:
     project:
-      name: "termux/termux-app"
-      description: "Terminal emulator and Linux environment for Android"
-    notification_email: fredrik@fornwall.net
+      name: brysgo/termux-app
+      description: Terminal emulator and Linux environment for Android
+    notification_email: brysgo@gmail.com
     build_command_prepend: "./gradlew clean"
-    build_command: "./gradlew assemble"
-    branch_pattern: coverity_scan
+    build_command: "./gradlew build"
+    branch_pattern: master

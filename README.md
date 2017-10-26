@@ -3,24 +3,17 @@ Termux app
 [![Travis build status](https://travis-ci.org/termux/termux-app.svg?branch=master)](https://travis-ci.org/termux/termux-app)
 [![Join the chat at https://gitter.im/termux/termux](https://badges.gitter.im/termux/termux.svg)](https://gitter.im/termux/termux)
 
-
-Termux is an Android terminal app and Linux environment.
+[Termux](https://termux.com) is an Android terminal app and Linux environment.
 
 * [Termux on Google Play Store](https://play.google.com/store/apps/details?id=com.termux)
 * [Termux on F-Droid](https://f-droid.org/repository/browse/?fdid=com.termux)
-* [termux.com](http://termux.com)
-* [Termux Help](http://termux.com/help/)
-* [Termux app on GitHub](https://github.com/termux/termux-app)
-* [Termux packages on GitHub](https://github.com/termux/termux-packages)
+* [Termux Facebook](https://facebook.com/termux/)
 * [Termux Google+ community](http://termux.com/community/)
+* [Termux Help](http://termux.com/help/)
+* [Termux Twitter](http://twitter.com/termux/)
+* [Termux Wiki](https://wiki.termux.com/wiki/)  
 
-License
-=======
-Released under [the GPLv3 license](https://www.gnu.org/licenses/gpl.html). Contains code from `Terminal Emulator for Android` which is released under [the Apache License 2.0](https://www.apache.org/licenses/).
-
-Building JNI libraries
-======================
-Execute the `build-jnilibs.sh` script to build the required JNI libraries.
+Note that this repository is for the app itself (the user interface and the terminal emulation). For the packages installable inside the app, see [termux/termux-packages](https://github.com/termux/termux-packages)
 
 Terminal resources
 ==================

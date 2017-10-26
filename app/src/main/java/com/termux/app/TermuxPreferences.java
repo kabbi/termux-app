@@ -36,7 +36,6 @@ final class TermuxPreferences {
     private static final String SHOW_EXTRA_KEYS_KEY = "show_extra_keys";
     private static final String FONTSIZE_KEY = "fontsize";
     private static final String CURRENT_SESSION_KEY = "current_session";
-    private static final String SHOW_WELCOME_DIALOG_KEY = "intro_dialog";
 
     private boolean mFullScreen;
     private int mFontSize;
@@ -105,7 +104,7 @@ final class TermuxPreferences {
     }
 
     static void storeCurrentSession(Context context, TerminalSession session) {
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putString(TermuxPreferences.CURRENT_SESSION_KEY, session.mHandle).commit();
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putString(TermuxPreferences.CURRENT_SESSION_KEY, session.mHandle).apply();
     }
 
     static TerminalSession getCurrentSession(TermuxActivity context) {
@@ -115,14 +114,6 @@ final class TermuxPreferences {
             if (session.mHandle.equals(sessionHandle)) return session;
         }
         return null;
-    }
-
-    public static boolean isShowWelcomeDialog(Context context) {
-        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(SHOW_WELCOME_DIALOG_KEY, true);
-    }
-
-    public static void disableWelcomeDialog(Context context) {
-        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(SHOW_WELCOME_DIALOG_KEY, false).apply();
     }
 
     public void reloadFromProperties(Context context) {
